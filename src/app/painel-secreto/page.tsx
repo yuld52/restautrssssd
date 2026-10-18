@@ -11,10 +11,10 @@ export const dynamic = "force-dynamic";
 
 const SecretAdminPage = async () => {
   const cookieStore = await cookies();
-  const session = cookieStore.get("admin_session");
+  const session = cookieStore.get("super_admin_session");
 
-  if (!session || session.value !== "authenticated_admin") {
-    return <AdminLogin />;
+  if (!session || session.value !== "authenticated_super_admin") {
+    return <AdminLogin isSuperAdmin={true} />;
   }
 
   const allCompanies = await getAllRestaurants();
@@ -63,6 +63,8 @@ const SecretAdminPage = async () => {
       waiterCalls={waiterCalls}
       initialVideoAnalytics={videoAnalytics}
       allCompanies={allCompanies}
+      isSuperAdmin={true}
+      defaultTab="companies"
     />
   );
 };

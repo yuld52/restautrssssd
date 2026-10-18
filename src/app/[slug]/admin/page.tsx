@@ -43,10 +43,19 @@ const CompanyAdminPage = async ({ params }: CompanyAdminPageProps) => {
   }
 
   const cookieStore = await cookies();
-  const session = cookieStore.get("admin_session") || cookieStore.get(`company_session_${restaurant.slug}`);
+  const session =
+    cookieStore.get("admin_session") ||
+    cookieStore.get("super_admin_session") ||
+    cookieStore.get(`company_session_${restaurant.slug}`);
 
   if (!session) {
-    return <AdminLogin />;
+    return (
+      <AdminLogin
+        restaurantSlug={restaurant.slug}
+        restaurantName={restaurant.name}
+        isSuperAdmin={false}
+      />
+    );
   }
 
   const [categories, products, orders, waiterCalls, videoAnalytics] =
@@ -88,6 +97,8 @@ const CompanyAdminPage = async ({ params }: CompanyAdminPageProps) => {
       waiterCalls={waiterCalls}
       initialVideoAnalytics={videoAnalytics}
       allCompanies={[restaurant]}
+      isSuperAdmin={false}
+      defaultTab="orders"
     />
   );
 };

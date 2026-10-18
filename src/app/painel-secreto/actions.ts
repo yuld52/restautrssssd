@@ -8,10 +8,15 @@ import { db } from "@/lib/prisma";
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
 
-export async function verifyAdminPin(pin: string, restaurantSlug?: string) {
-  // Se for o PIN master global
+export async function verifySuperAdminPin(pin: string) {
   if (pin.trim() === ADMIN_PIN.trim()) {
     const cookieStore = await cookies();
+    cookieStore.set("super_admin_session", "authenticated_super_admin", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
     cookieStore.set("admin_session", "authenticated_admin", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -20,62 +25,68 @@ export async function verifyAdminPin(pin: string, restaurantSlug?: string) {
     });
     return { success: true, isMaster: true };
   }
+  return { success: false, error: "PIN Master incorreto. Tente novamente." };
+}
 
-  // Se passou o slug de um restaurante específico, valida o PIN exclusivo da empresa
-  if (restaurantSlug) {
-    const restaurant = await db.restaurant.findUnique({
-      where: { slug: restaurantSlug },
-    });
-
-    if (restaurant && restaurant.adminPin === pin.trim()) {
-      if (!restaurant.isActive) {
-        return {
-          success: false,
-          error: "Esta empresa está temporariamente desativada. Contate o administrador.",
-        };
-      }
-
-      const cookieStore = await cookies();
-      cookieStore.set(`company_session_${restaurant.slug}`, "authenticated", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 7,
-        path: "/",
-      });
-      return { success: true, isMaster: false, companyId: restaurant.id };
-    }
-  }
-
-  // Também verifica se o PIN digitado corresponde ao PIN de qualquer empresa cadastrada
-  const matchCompany = await db.restaurant.findFirst({
-    where: { adminPin: pin.trim() },
-  });
-
-  if (matchCompany) {
-    if (!matchCompany.isActive) {
-      return {
-        success: false,
-        error: "Esta empresa está temporariamente desativada. Contate o administrador.",
-      };
-    }
-
+export async function verifyCompanyPin(slug: string, pin: string) {
+  // O PIN master sempre tem permissão de entrar para suporte
+  if (pin.trim() === ADMIN_PIN.trim()) {
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", "authenticated_admin", {
+    cookieStore.set(`company_session_${slug}`, "authenticated", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
-    return { success: true, companyId: matchCompany.id };
+    return { success: true, isMaster: true };
+  }
+
+  const restaurant = await db.restaurant.findUnique({
+    where: { slug },
+  });
+
+  if (!restaurant) {
+    return { success: false, error: "Empresa não encontrada." };
+  }
+
+  if (!restaurant.isActive) {
+    return {
+      success: false,
+      error: "Esta empresa está temporariamente suspensa. Contate o suporte.",
+    };
+  }
+
+  if (restaurant.adminPin === pin.trim()) {
+    const cookieStore = await cookies();
+    cookieStore.set(`company_session_${restaurant.slug}`, "authenticated", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 7,
+      path: "/",
+    });
+    return { success: true, isMaster: false, companyId: restaurant.id };
   }
 
   return { success: false, error: "PIN incorreto. Tente novamente." };
 }
 
-export async function logoutAdmin() {
+export async function verifyAdminPin(pin: string, restaurantSlug?: string) {
+  if (restaurantSlug) {
+    return await verifyCompanyPin(restaurantSlug, pin);
+  }
+
+  return await verifySuperAdminPin(pin);
+}
+
+export async function logoutAdmin(restaurantSlug?: string) {
   const cookieStore = await cookies();
   cookieStore.delete("admin_session");
+  cookieStore.delete("super_admin_session");
+  if (restaurantSlug) {
+    cookieStore.delete(`company_session_${restaurantSlug}`);
+  }
   revalidatePath("/painel-secreto");
+  revalidatePath("/super-admin");
   return { success: true };
 }
 
@@ -323,7 +334,7 @@ export async function getVideoAnalytics(restaurantId?: string) {
   };
 }
 
-export async function getLatestAdminData(restaurantId?: string) {
+export async function getLatestAdminData(restaurantId?: string, isSuperAdmin = false) {
   const restaurant = restaurantId
     ? await db.restaurant.findUnique({ where: { id: restaurantId } })
     : await db.restaurant.findFirst();
@@ -351,7 +362,7 @@ export async function getLatestAdminData(restaurantId?: string) {
         take: 50,
       }),
       getVideoAnalytics(restaurant.id),
-      getAllRestaurants(),
+      isSuperAdmin ? getAllRestaurants() : Promise.resolve([]),
     ]);
 
   return { orders, waiterCalls, videoAnalytics, allRestaurants };

@@ -41,6 +41,8 @@ interface AdminDashboardProps {
   waiterCalls: WaiterCall[];
   initialVideoAnalytics?: VideoAnalyticsData | null;
   allCompanies?: CompanyWithCounts[];
+  isSuperAdmin?: boolean;
+  defaultTab?: "orders" | "waiter" | "menu" | "videos" | "nfc" | "companies";
 }
 
 const AdminDashboard = ({
@@ -51,17 +53,21 @@ const AdminDashboard = ({
   waiterCalls: initialWaiterCalls,
   initialVideoAnalytics = null,
   allCompanies = [],
+  isSuperAdmin = false,
+  defaultTab,
 }: AdminDashboardProps) => {
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant>(initialRestaurant);
   const [categories, setCategories] = useState<MenuCategory[]>(initialCategories);
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [companiesList, setCompaniesList] = useState<CompanyWithCounts[]>(
-    allCompanies.length > 0 ? allCompanies : [initialRestaurant as CompanyWithCounts]
+    isSuperAdmin && allCompanies.length > 0
+      ? allCompanies
+      : [initialRestaurant as CompanyWithCounts]
   );
 
   const [activeTab, setActiveTab] = useState<
     "orders" | "waiter" | "menu" | "videos" | "nfc" | "companies"
-  >("orders");
+  >(defaultTab || (isSuperAdmin ? "companies" : "orders"));
   const [ordersList, setOrdersList] = useState<OrderWithDetails[]>(initialOrders);
   const [waiterCallsList, setWaiterCallsList] = useState<WaiterCall[]>(initialWaiterCalls);
   const [videoAnalytics, setVideoAnalytics] = useState<VideoAnalyticsData | null>(
@@ -120,7 +126,7 @@ const AdminDashboard = ({
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const data = await getLatestAdminData(currentRestaurant.id);
+        const data = await getLatestAdminData(currentRestaurant.id, isSuperAdmin);
         if (!data) return;
 
         setOrdersList(data.orders as OrderWithDetails[]);
@@ -128,7 +134,7 @@ const AdminDashboard = ({
         if (data.videoAnalytics) {
           setVideoAnalytics(data.videoAnalytics as VideoAnalyticsData);
         }
-        if (data.allRestaurants && data.allRestaurants.length > 0) {
+        if (isSuperAdmin && data.allRestaurants && data.allRestaurants.length > 0) {
           setCompaniesList(data.allRestaurants as CompanyWithCounts[]);
         }
 
@@ -156,7 +162,7 @@ const AdminDashboard = ({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [soundEnabled, currentRestaurant.id]);
+  }, [soundEnabled, currentRestaurant.id, isSuperAdmin]);
 
   const handleTestSound = () => {
     soundAlert.playWaiterBell();
@@ -165,7 +171,7 @@ const AdminDashboard = ({
   };
 
   const handleLogout = async () => {
-    await logoutAdmin();
+    await logoutAdmin(currentRestaurant.slug);
     window.location.reload();
   };
 
@@ -185,8 +191,8 @@ const AdminDashboard = ({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                {/* SELETOR RÁPIDO DE EMPRESAS CLIENTES */}
-                {companiesList.length > 1 ? (
+                {/* SELETOR RÁPIDO DE EMPRESAS CLIENTES - APENAS SUPER ADMIN */}
+                {isSuperAdmin && companiesList.length > 1 ? (
                   <div className="relative inline-flex items-center">
                     <select
                       value={currentRestaurant.id}
@@ -208,12 +214,20 @@ const AdminDashboard = ({
                   </h1>
                 )}
 
-                <span className="flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 px-2 py-0.5 text-[10px] font-bold shrink-0">
-                  <ShieldCheckIcon className="h-3 w-3" /> SaaS Master
-                </span>
+                {isSuperAdmin ? (
+                  <span className="flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold shrink-0">
+                    <ShieldCheckIcon className="h-3 w-3 text-amber-600" /> Super Admin
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-0.5 text-[10px] font-bold shrink-0">
+                    🏪 Painel da Loja
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 truncate">
-                Painel Multitenant • {currentRestaurant.name} (/{currentRestaurant.slug})
+                {isSuperAdmin
+                  ? `Admin do Admin • Gerenciando: ${currentRestaurant.name} (/${currentRestaurant.slug})`
+                  : `Painel Operacional • ${currentRestaurant.name} (/${currentRestaurant.slug})`}
               </p>
             </div>
           </div>
@@ -377,29 +391,31 @@ const AdminDashboard = ({
             <span>Mesas (NFC &amp; QR Code)</span>
           </Button>
 
-          {/* ABA EXCLUSIVA SAAS: EMPRESAS */}
-          <Button
-            size="sm"
-            variant={activeTab === "companies" ? "default" : "ghost"}
-            onClick={() => setActiveTab("companies")}
-            className={`rounded-xl text-xs font-bold gap-2 transition-all ${
-              activeTab === "companies"
-                ? "bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
-                : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            <Building2Icon className="h-4 w-4 text-amber-600" />
-            <span>Empresas (SaaS)</span>
-            <span
-              className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] ${
+          {/* ABA EXCLUSIVA SAAS: EMPRESAS (SOMENTE SUPER ADMIN) */}
+          {isSuperAdmin && (
+            <Button
+              size="sm"
+              variant={activeTab === "companies" ? "default" : "ghost"}
+              onClick={() => setActiveTab("companies")}
+              className={`rounded-xl text-xs font-bold gap-2 transition-all ${
                 activeTab === "companies"
-                  ? "bg-white/20 text-white font-extrabold"
-                  : "bg-amber-100 text-amber-900 font-bold"
+                  ? "bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
+                  : "text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
               }`}
             >
-              {companiesList.length}
-            </span>
-          </Button>
+              <Building2Icon className="h-4 w-4 text-amber-600" />
+              <span>Empresas (SaaS)</span>
+              <span
+                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] ${
+                  activeTab === "companies"
+                    ? "bg-white/20 text-white font-extrabold"
+                    : "bg-amber-100 text-amber-900 font-bold"
+                }`}
+              >
+                {companiesList.length}
+              </span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -420,7 +436,7 @@ const AdminDashboard = ({
           <VideoAnalyticsManager data={videoAnalytics} />
         )}
         {activeTab === "nfc" && <NfcGenerator restaurant={currentRestaurant} />}
-        {activeTab === "companies" && (
+        {activeTab === "companies" && isSuperAdmin && (
           <CompaniesManager
             companies={companiesList}
             selectedCompanyId={currentRestaurant.id}

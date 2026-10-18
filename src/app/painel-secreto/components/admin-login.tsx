@@ -1,14 +1,24 @@
 "use client";
 
-import { KeyRoundIcon, LockIcon, ShieldAlertIcon } from "lucide-react";
+import { KeyRoundIcon, LockIcon, ShieldAlertIcon, ShieldCheckIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { verifyAdminPin } from "../actions";
+import { verifyAdminPin, verifyCompanyPin, verifySuperAdminPin } from "../actions";
 
-const AdminLogin = () => {
+interface AdminLoginProps {
+  restaurantSlug?: string;
+  restaurantName?: string;
+  isSuperAdmin?: boolean;
+}
+
+const AdminLogin = ({
+  restaurantSlug,
+  restaurantName,
+  isSuperAdmin = false,
+}: AdminLoginProps) => {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -20,7 +30,15 @@ const AdminLogin = () => {
     setError("");
 
     try {
-      const res = await verifyAdminPin(pin);
+      let res;
+      if (isSuperAdmin) {
+        res = await verifySuperAdminPin(pin);
+      } else if (restaurantSlug) {
+        res = await verifyCompanyPin(restaurantSlug, pin);
+      } else {
+        res = await verifyAdminPin(pin, restaurantSlug);
+      }
+
       if (res.success) {
         window.location.reload();
       } else {
@@ -49,14 +67,29 @@ const AdminLogin = () => {
       <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl">
         <div className="flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 shadow-inner">
-            <LockIcon className="h-8 w-8" />
+            {isSuperAdmin ? (
+              <ShieldCheckIcon className="h-8 w-8 text-amber-600" />
+            ) : (
+              <LockIcon className="h-8 w-8" />
+            )}
           </div>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
-            Painel Administrativo
+            {isSuperAdmin
+              ? "Super Admin SaaS"
+              : restaurantName
+              ? restaurantName
+              : "Painel Administrativo"}
           </h1>
           <p className="mt-1 text-xs text-slate-500">
-            Área restrita de gestão de pedidos, cardápio e mesas
+            {isSuperAdmin
+              ? "Admin do Admin • Gestão de Empresas e Plataforma SaaS"
+              : "Painel da Loja • Gestão de pedidos, cardápio e mesas"}
           </p>
+          {isSuperAdmin && (
+            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
+              🛡️ Modo Master Multitenant
+            </span>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
@@ -80,7 +113,11 @@ const AdminLogin = () => {
                 maxLength={8}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="Digite o PIN (Padrão: 1234)"
+                placeholder={
+                  isSuperAdmin
+                    ? "Digite o PIN Master (Padrão: 1234)"
+                    : "Digite o PIN da Loja (Padrão: 1234)"
+                }
                 className="rounded-xl border-slate-300 bg-slate-50 text-center text-lg font-mono tracking-widest text-slate-900 placeholder:text-xs placeholder:tracking-normal placeholder:text-slate-400 focus:border-amber-500 focus:bg-white"
               />
             </div>
@@ -132,7 +169,9 @@ const AdminLogin = () => {
           </div>
 
           <p className="text-center text-[11px] text-slate-500">
-            Dica: O PIN padrão de fábrica é <strong>1234</strong> (configurável via variável <code className="text-amber-700 bg-amber-50 px-1 py-0.5 rounded border border-amber-200">ADMIN_PIN</code>).
+            {isSuperAdmin
+              ? "Acesso exclusivo para administradores da plataforma SaaS."
+              : "Acesso restrito para a equipe operacional da loja."}
           </p>
         </form>
       </div>

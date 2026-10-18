@@ -1,0 +1,72 @@
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+
+import { db } from "@/lib/prisma";
+
+import { getAllRestaurants, getVideoAnalytics } from "../painel-secreto/actions";
+import AdminDashboard from "../painel-secreto/components/admin-dashboard";
+import AdminLogin from "../painel-secreto/components/admin-login";
+
+export const dynamic = "force-dynamic";
+
+const SuperAdminPage = async () => {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("super_admin_session");
+
+  if (!session || session.value !== "authenticated_super_admin") {
+    return <AdminLogin isSuperAdmin={true} />;
+  }
+
+  const allCompanies = await getAllRestaurants();
+  const restaurant = allCompanies[0] || (await db.restaurant.findFirst());
+
+  if (!restaurant) {
+    return notFound();
+  }
+
+  const [categories, products, orders, waiterCalls, videoAnalytics] =
+    await Promise.all([
+      db.menuCategory.findMany({
+        where: { restaurantId: restaurant.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      db.product.findMany({
+        where: { restaurantId: restaurant.id },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.order.findMany({
+        where: { restaurantId: restaurant.id },
+        include: {
+          orderProducts: {
+            include: {
+              product: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      db.waiterCall.findMany({
+        where: { restaurantId: restaurant.id },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      getVideoAnalytics(restaurant.id),
+    ]);
+
+  return (
+    <AdminDashboard
+      restaurant={restaurant}
+      categories={categories}
+      products={products}
+      orders={orders}
+      waiterCalls={waiterCalls}
+      initialVideoAnalytics={videoAnalytics}
+      allCompanies={allCompanies}
+      isSuperAdmin={true}
+      defaultTab="companies"
+    />
+  );
+};
+
+export default SuperAdminPage;
