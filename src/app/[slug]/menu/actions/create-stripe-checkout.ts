@@ -14,7 +14,7 @@ interface CreateStripeCheckoutInput {
   orderId: number;
   slug: string;
   consumptionMethod: ConsumptionMethod;
-  cpf: string;
+  cpf?: string;
 }
 
 export const createStripeCheckout = async ({
@@ -44,7 +44,10 @@ export const createStripeCheckout = async ({
 
   const searchParams = new URLSearchParams();
   searchParams.set("consumptionMethod", consumptionMethod);
-  searchParams.set("cpf", removeCpfPunctuation(cpf));
+  searchParams.set("orderId", String(orderId));
+  if (cpf) {
+    searchParams.set("cpf", removeCpfPunctuation(cpf));
+  }
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],

@@ -13,8 +13,14 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "FSW Donalds | Totem de Autoatendimento",
-  description: "Sistema full-stack de pedidos para restaurantes com Next.js, Stripe e Prisma.",
+  title: "Burger Craft • Hamburgueria Artesanal & Grill",
+  description:
+    "Cardápio digital, vídeos dos pratos, pedidos na mesa e totem de autoatendimento do Burger Craft.",
+  icons: {
+    icon: "/burger-craft-logo.png",
+    shortcut: "/burger-craft-logo.png",
+    apple: "/burger-craft-logo.png",
+  },
 };
 
 export default function RootLayout({

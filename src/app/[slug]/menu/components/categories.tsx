@@ -1,7 +1,7 @@
 "use client";
 
 import { Prisma } from "@prisma/client";
-import { ClockIcon } from "lucide-react";
+import { ClockIcon, FilmIcon, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import { useContext, useState } from "react";
 
@@ -10,7 +10,9 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/helpers/format-currency";
 
 import { CartContext } from "../contexts/cart";
+import CallWaiterDialog from "./call-waiter-dialog";
 import CartSheet from "./cart-sheet";
+import FoodReelsModal from "./food-reels-modal";
 import Products from "./products";
 
 interface RestaurantCategoriesProps {
@@ -21,18 +23,25 @@ interface RestaurantCategoriesProps {
       };
     };
   }>;
+  mesa?: string;
 }
 
 type MenuCategoriesWithProducts = Prisma.MenuCategoryGetPayload<{
   include: { products: true };
 }>;
 
-const RestaurantCategories = ({ restaurant }: RestaurantCategoriesProps) => {
+const RestaurantCategories = ({
+  restaurant,
+  mesa,
+}: RestaurantCategoriesProps) => {
   const [selectedCategory, setSelectedCategory] =
     useState<MenuCategoriesWithProducts>(restaurant.menuCategories[0]);
-  
+  const [isReelsOpen, setIsReelsOpen] = useState(false);
+
   const { products, total, toggleCart, totalQuantity } =
     useContext(CartContext);
+
+  const allProducts = restaurant.menuCategories.flatMap((c) => c.products);
 
   const handleCategoryClick = (category: MenuCategoriesWithProducts) => {
     setSelectedCategory(category);
@@ -46,37 +55,75 @@ const RestaurantCategories = ({ restaurant }: RestaurantCategoriesProps) => {
     <div className="relative z-50 mt-[-1.5rem] flex flex-1 flex-col overflow-hidden rounded-t-3xl bg-white">
       
       {/* 1. CABEÇALHO DO CARD (Fixo: Não rola) */}
-      <div className="flex-none p-5 pb-0">
-        <div className="flex items-center gap-3">
-          <Image
-            src={restaurant.avatarImageUrl}
-            alt={restaurant.name}
-            height={45}
-            width={45}
-            className="rounded-full object-cover"
-          />
-          <div>
-            <h2 className="text-lg font-semibold">{restaurant.name}</h2>
-            <p className="text-xs opacity-55">{restaurant.description}</p>
+      <div className="flex-none p-4 pb-0 space-y-3">
+        {/* Linha 1: Avatar, Nome, Descrição e Mesa/Status */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Image
+              src={restaurant.avatarImageUrl}
+              alt={restaurant.name}
+              height={46}
+              width={46}
+              className="rounded-full object-cover shrink-0"
+            />
+            <div className="min-w-0">
+              <h2 className="text-base font-bold truncate leading-tight">
+                {restaurant.name}
+              </h2>
+              <p className="text-xs opacity-60 truncate">
+                {restaurant.description}
+              </p>
+            </div>
           </div>
+
+          {mesa ? (
+            <div className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-bold text-green-700 shrink-0 shadow-sm">
+              <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Mesa {mesa}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 text-xs text-green-600 font-semibold shrink-0">
+              <ClockIcon size={12} />
+              <p>Aberto!</p>
+            </div>
+          )}
         </div>
-        <div className="mt-3 flex items-center gap-1 text-xs text-green-500">
-          <ClockIcon size={12} />
-          <p>Aberto!</p>
+
+        {/* Linha 2: BARRA DE AÇÕES MOBILE-FIRST (Touch targets grandes para o polegar) */}
+        <div className="grid grid-cols-2 gap-2 pt-0.5">
+          <CallWaiterDialog mesa={mesa} />
+
+          <Button
+            onClick={() => setIsReelsOpen(true)}
+            className="w-full h-11 rounded-2xl bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white font-bold text-xs shadow-sm hover:opacity-95 gap-2 transition-all active:scale-[0.98]"
+          >
+            <FilmIcon className="h-4 w-4 animate-pulse" />
+            <span>Vídeos dos Pratos 🔥</span>
+          </Button>
         </div>
       </div>
 
       {/* 2. BOTÕES DE CATEGORIAS (Fixo verticalmente, scroll apenas lateral) */}
       <div className="flex-none mt-2">
         <ScrollArea className="w-full">
-          <div className="flex w-max space-x-4 p-4 pt-2">
+          <div className="flex w-max space-x-3 p-4 pt-2">
+            <Button
+              onClick={() => setIsReelsOpen(true)}
+              variant="outline"
+              size="sm"
+              className="rounded-full border-red-200 bg-red-50 text-red-700 font-bold hover:bg-red-100 gap-1"
+            >
+              <SparklesIcon className="h-3.5 w-3.5 text-red-500" />
+              <span>Ver em Vídeo</span>
+            </Button>
+
             {restaurant.menuCategories.map((category) => (
               <Button
                 onClick={() => handleCategoryClick(category)}
                 key={category.id}
                 variant={getCategoryButtonVariant(category)}
                 size="sm"
-                className="rounded-full"
+                className="rounded-full font-medium"
               >
                 {category.name}
               </Button>
@@ -114,6 +161,14 @@ const RestaurantCategories = ({ restaurant }: RestaurantCategoriesProps) => {
           <CartSheet />
         </div>
       )}
+
+      {/* MODAL / FEED VERTICAL DE REELS (VÍDEOS DOS PRATOS) */}
+      <FoodReelsModal
+        products={allProducts}
+        isOpen={isReelsOpen}
+        onClose={() => setIsReelsOpen(false)}
+        mesa={mesa}
+      />
     </div>
   );
 };

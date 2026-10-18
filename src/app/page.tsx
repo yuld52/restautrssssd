@@ -35,20 +35,20 @@ export default function HomePage() {
           </div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white mb-6">
-            Totem de <br /> autoatendimento
+            Burger Craft <br /> Autoatendimento
           </h1>
           
           <p className="text-lg md:text-xl text-zinc-400 mb-10 max-w-lg leading-relaxed">
-            Sistema completo de pedidos para restaurantes — cardápio digital, carrinho e pagamento via Stripe, tudo em um fluxo mobile-first.
+            Cardápio digital, vídeos dos hambúrgueres artesanais, chamada de garçom com som e pedidos direto na mesa.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto">
             <Link 
-              href="/fsw-donalds" 
-              className="w-full sm:w-auto px-6 py-3 bg-[#2a2a2a] hover:bg-[#3a3a3a] border border-[#3a3a3a] text-white font-medium rounded-xl flex items-center justify-center gap-2 transition-all"
+              href="/burger-craft" 
+              className="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
             >
               <ArrowRight className="w-5 h-5" />
-              Testar o totem
+              Acessar Cardápio
             </Link>
             
             <Link 

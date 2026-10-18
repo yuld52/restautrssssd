@@ -34,21 +34,12 @@ import { Input } from "@/components/ui/input";
 import { createOrder } from "../actions/create-order";
 import { createStripeCheckout } from "../actions/create-stripe-checkout";
 import { CartContext } from "../contexts/cart";
-import { isValidCpf } from "../helpers/cpf";
 
 const formSchema = z.object({
   name: z.string().trim().min(1, {
     message: "O nome é obrigatório.",
   }),
-  cpf: z
-    .string()
-    .trim()
-    .min(1, {
-      message: "O CPF é obrigatório.",
-    })
-    .refine((value) => isValidCpf(value), {
-      message: "CPF inválido.",
-    }),
+  tableNumber: z.string().optional(),
 });
 
 type FormSchema = z.infer<typeof formSchema>;
@@ -63,42 +54,59 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
   const { products } = useContext(CartContext);
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const mesaFromParams = searchParams.get("mesa") || searchParams.get("table");
+
   const form = useForm<FormSchema>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      cpf: "",
+      tableNumber: mesaFromParams || "",
     },
     shouldUnregister: true,
   });
+
   const onSubmit = async (data: FormSchema) => {
     try {
       setIsLoading(true);
-      const consumptionMethod = searchParams.get(
+      const consumptionMethod = (searchParams.get(
         "consumptionMethod",
-      ) as ConsumptionMethod;
+      ) || "DINE_IN") as ConsumptionMethod;
+
+      const finalTableNumber = mesaFromParams || data.tableNumber || undefined;
 
       const order = await createOrder({
         consumptionMethod,
-        customerCpf: data.cpf,
         customerName: data.name,
         products,
         slug,
+        tableNumber: finalTableNumber,
       });
-      const { sessionId } = await createStripeCheckout({
-        products,
-        orderId: order.id,
-        slug,
-        consumptionMethod,
-        cpf: data.cpf,
-      });
-      if (!process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY) return;
-      const stripe = await loadStripe(
-        process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY,
-      );
-      stripe?.redirectToCheckout({
-        sessionId: sessionId,
-      });
+
+      if (process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY) {
+        try {
+          const { sessionId } = await createStripeCheckout({
+            products,
+            orderId: order.id,
+            slug,
+            consumptionMethod,
+          });
+          const stripe = await loadStripe(
+            process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY,
+          );
+          if (stripe && sessionId) {
+            stripe.redirectToCheckout({
+              sessionId: sessionId,
+            });
+            return;
+          }
+        } catch (stripeErr) {
+          console.warn("Stripe checkout error, redirecting to orders:", stripeErr);
+        }
+      }
+
+      // Redireciona para a lista de pedidos com o ID do pedido e a mesa
+      const tableParam = finalTableNumber ? `&mesa=${encodeURIComponent(finalTableNumber)}` : "";
+      window.location.href = `/${slug}/orders?orderId=${order.id}${tableParam}`;
     } catch (error) {
       console.error(error);
     } finally {
@@ -117,7 +125,27 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
         </DrawerHeader>
         <div className="p-5">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {mesaFromParams ? (
+                <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-xs font-medium text-green-800">
+                  <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span>📍 Pedido para a <strong>Mesa {mesaFromParams}</strong></span>
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="tableNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Número da Mesa / Comanda (opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ex: Mesa 12" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={form.control}
                 name="name"
@@ -126,24 +154,6 @@ const FinishOrderDialog = ({ open, onOpenChange }: FinishOrderDialogProps) => {
                     <FormLabel>Seu nome</FormLabel>
                     <FormControl>
                       <Input placeholder="Digite seu nome..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cpf"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seu CPF</FormLabel>
-                    <FormControl>
-                      <PatternFormat
-                        placeholder="Digite seu CPF..."
-                        format="###.###.###-##"
-                        customInput={Input}
-                        {...field}
-                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -64,19 +64,26 @@ const OrderList = ({ orders }: OrderListProps) => {
       {orders.map((order) => (
         <Card key={order.id}>
           <CardContent className="space-y-4 p-5">
-            <div
-              className={`w-fit rounded-full px-2 py-1 text-xs font-semibold text-white ${
-                (
-                  [
-                    OrderStatus.PAYMENT_CONFIRMED,
-                    OrderStatus.FINISHED,
-                  ] as OrderStatus[]
-                ).includes(order.status)
-                  ? "bg-green-500 text-white"
-                  : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              {getStatusLabel(order.status)}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-fit rounded-full px-2 py-1 text-xs font-semibold text-white ${
+                  (
+                    [
+                      OrderStatus.PAYMENT_CONFIRMED,
+                      OrderStatus.FINISHED,
+                    ] as OrderStatus[]
+                  ).includes(order.status)
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                {getStatusLabel(order.status)}
+              </div>
+              {order.tableNumber && (
+                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                  Mesa {order.tableNumber}
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-2">

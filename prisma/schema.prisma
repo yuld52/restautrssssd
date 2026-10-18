@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,11 +17,20 @@ model Restaurant {
   description    String
   avatarImageUrl String
   coverImageUrl  String
+  adminPin       String         @default("1234") // PIN exclusivo desta empresa cliente
+  isActive       Boolean        @default(true)   // Status da assinatura (ativo/bloqueado)
+  plan           String         @default("PRO")  // Plano contratado (BASIC, PRO, ENTERPRISE)
+  contactPhone   String?                         // Telefone/WhatsApp da empresa
+  contactEmail   String?                         // Email do responsável
   menuCategories MenuCategory[]
   products       Product[]
   orders         Order[]
+  waiterCalls    WaiterCall[]
+  videoViews     VideoView[]
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  @@index([slug])
 }
 
 model MenuCategory {
@@ -35,6 +41,8 @@ model MenuCategory {
   products     Product[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+
+  @@index([restaurantId])
 }
 
 model Product {
@@ -43,14 +51,19 @@ model Product {
   description    String
   price          Float
   imageUrl       String
+  videoUrl       String?
   ingredients    String[]
   orderProducts  OrderProduct[]
+  videoViews     VideoView[]
   restaurant     Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   restaurantId   String
   menuCategory   MenuCategory   @relation(fields: [menuCategoryId], references: [id], onDelete: Cascade)
   menuCategoryId String
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+
+  @@index([restaurantId])
+  @@index([menuCategoryId])
 }
 
 model Order {
@@ -58,13 +71,17 @@ model Order {
   total             Float
   status            OrderStatus
   consumptionMethod ConsumptionMethod
+  tableNumber       String?
   restaurant        Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   restaurantId      String
   orderProducts     OrderProduct[]
   customerName      String
-  customerCpf       String
+  customerCpf       String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+
+  @@index([restaurantId])
+  @@index([restaurantId, status])
 }
 
 model OrderProduct {
@@ -77,6 +94,9 @@ model OrderProduct {
   price     Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 enum OrderStatus {
@@ -90,4 +110,38 @@ enum OrderStatus {
 enum ConsumptionMethod {
   TAKEAWAY
   DINE_IN
+}
+
+model WaiterCall {
+  id           String           @id @default(uuid())
+  tableNumber  String
+  reason       String           @default("Atendimento na mesa")
+  status       WaiterCallStatus @default(PENDING)
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurantId String
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([restaurantId])
+  @@index([restaurantId, status])
+}
+
+enum WaiterCallStatus {
+  PENDING
+  ATTENDED
+  CANCELLED
+}
+
+model VideoView {
+  id           String      @id @default(uuid())
+  duration     Float
+  tableNumber  String?
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurantId String?
+  createdAt    DateTime    @default(now())
+
+  @@index([productId])
+  @@index([restaurantId])
 }

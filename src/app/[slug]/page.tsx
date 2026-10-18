@@ -7,11 +7,18 @@ import ConsumptionMethodOption from "./components/consumption-method-option";
 
 interface RestaurantPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ mesa?: string; table?: string }>;
 }
 
-const RestaurantPage = async ({ params }: RestaurantPageProps) => {
+const RestaurantPage = async ({ params, searchParams }: RestaurantPageProps) => {
   const { slug } = await params;
-  const restaurant = await db.restaurant.findUnique({ where: { slug } });
+  const resolvedSearchParams = await searchParams;
+  const mesa = resolvedSearchParams?.mesa || resolvedSearchParams?.table;
+
+  let restaurant = await db.restaurant.findUnique({ where: { slug } });
+  if (!restaurant) {
+    restaurant = await db.restaurant.findFirst();
+  }
   if (!restaurant) {
     return notFound();
   }
@@ -25,23 +32,35 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
           width={82}
           height={82}
         />
-        <h2 className="font-semibold">{restaurant.name}</h2>
+        <h2 className="font-semibold text-lg">{restaurant.name}</h2>
       </div>
+
+      {/* MESA IDENTIFICADA */}
+      {mesa && (
+        <div className="mt-4 flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-1.5 text-xs font-semibold text-green-700 shadow-sm animate-pulse">
+          <span className="flex h-2 w-2 rounded-full bg-green-500"></span>
+          <span>Mesa {mesa}</span>
+        </div>
+      )}
+
       {/* BEM VINDO */}
-      <div className="space-y-2 pt-24 text-center">
+      <div className="space-y-2 pt-16 text-center">
         <h3 className="text-2xl font-semibold">Seja bem-vindo!</h3>
-        <p className="opacity-55">
-          Escolha como prefere aproveitar sua refeição. Estamos aqui para
-          oferecer praticidade e sabor em cada detalhe!
+        <p className="opacity-55 text-sm">
+          {mesa
+            ? `Você está na Mesa ${mesa}. Faça seu pedido pelo celular e entregamos diretamente para você!`
+            : "Escolha como prefere aproveitar sua refeição. Estamos aqui para oferecer praticidade e sabor em cada detalhe!"}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-4 pt-14">
+
+      <div className="grid grid-cols-2 gap-4 pt-10 w-full max-w-sm">
         <ConsumptionMethodOption
           slug={slug}
           option="DINE_IN"
-          buttonText="Para comer aqui"
+          buttonText={mesa ? `Comer na Mesa ${mesa}` : "Para comer aqui"}
           imageAlt="Comer aqui"
           imageUrl="/dine_in.png"
+          mesa={mesa}
         />
         <ConsumptionMethodOption
           slug={slug}
@@ -49,6 +68,7 @@ const RestaurantPage = async ({ params }: RestaurantPageProps) => {
           buttonText="Para levar"
           imageAlt="Para levar"
           imageUrl="/takeaway.png"
+          mesa={mesa}
         />
       </div>
     </div>
